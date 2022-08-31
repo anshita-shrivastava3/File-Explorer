@@ -353,49 +353,85 @@ void copy(string source_file, string destination_directory){
     string f, s;
     int pos;
     
-    // if(destination_directory[0]='~'){
-    //     s=get_home();
-    //     destination_directory=destination_directory.substr(1);
-    //     s+=source_file;
-    //     cout<<"value of source file: "<<f<<endl;
-    // }
     f=get_absolute_path(source_file);
     s=get_absolute_path(destination_directory);
     
     pos = f.find_last_of("/");
     s=s+f.substr(pos);
 
-    // cout<<"value of source file: "<<f<<endl;
-    // cout<<"value of dest file: "<<s<<endl;
-
     fd_one = open(f.c_str(), O_RDONLY);
     if (fd_one == -1)
     {
-        printf("Error opening first_file\n");
+        cout<<"Error opening first_file\n";
         close(fd_one);
     }
-    fd_two = open(s.c_str(), 
-                O_WRONLY | O_CREAT,
-                S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    fd_two = open(s.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     while(read(fd_one, &buf, 1))
     {
         write(fd_two, &buf, 1);
     }
 
-    //printf("Successful copy");
 
     close(fd_one);
     close(fd_two);
 }
 
+void delete_file(string d_file){
+    string f;
+    f=get_absolute_path(d_file);
+    if( remove(f.c_str()) != 0 )
+        perror( "Error" );
+}
+
+void rename(string old_name, string new_name){
+    char buf;
+    int fd_one, fd_two;
+    string f, s;
+    int pos;
+    
+    f=get_absolute_path(old_name);
+    pos = f.find_last_of("/");
+    s=f.substr(0,pos)+"/"+new_name;
+
+    cout<<"f is: "<<f<<endl;
+    cout<<"s is: "<<s<<endl;
+    
+
+    fd_one = open(f.c_str(), O_RDONLY);
+    if (fd_one == -1)
+    {
+        cout<<"Error opening first_file\n";
+        close(fd_one);
+    }
+
+    fd_two = open(s.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+    while(read(fd_one, &buf, 1))
+    {
+        write(fd_two, &buf, 1);
+    }
+
+
+    close(fd_one);
+    close(fd_two);
+
+    delete_file(old_name);
+}
+
+void create_file(string file_name, string destination_path){
+    int fp;
+    string file_path=get_absolute_path(destination_path)+file_name;
+    cout<<"file_name: "<<file_path<<endl;
+    fp=open(file_path.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+    close(fp);
+}
+
 string refresh_dir_command(){
-    //clear_terminal();
     cout<<"\n";
     set_status(pwds, 2);
     char ch;
     string s;
 
-    //cout<<"Enter ch: ";
     ch=cin.get();
     if(ch==27){
         switch_nc='n';
@@ -414,7 +450,23 @@ string refresh_dir_command(){
             cout<<"command[i]: "<<command[i]<<" command[n-1] "<<command[n-1]<<endl;
             copy(command[i], command[n-1]);
         }
+    }else if(command[0]=="delete_file"){
+        delete_file(command[1]);
+    }else if(command[0]=="move"){
+        int n=command.size();
+        for(int i=1; i<n-1; ++i){
+            cout<<"command[i]: "<<command[i]<<" command[n-1] "<<command[n-1]<<endl;
+            copy(command[i], command[n-1]);
+            delete_file(command[i]);
+        }
+    }else if(command[0]=="rename"){
+        //$ rename <file_path> <new_name>
+        rename(command[1], command[2]);
+    }else if(command[0]=="create_file"){
+        //create_file <file_name> <destination_path>
+        create_file(command[1], command[2]);
     }
+
     enable_non_can_mode();
     return s;
 }
