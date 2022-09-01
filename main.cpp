@@ -14,6 +14,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sstream>
+#include <algorithm>
 #include <stdlib.h>
 #include <stdio.h>
 #include <termios.h>
@@ -76,7 +77,7 @@ void enable_non_can_mode(){
    tcgetattr(STDIN_FILENO, &orig_termios);
    atexit(disable_non_can_mode);
    struct termios raw=orig_termios;
-   raw.c_lflag &= ~(/*ECHO | */ICANON);
+   raw.c_lflag &= ~(/*ECHO |*/ ICANON);
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
@@ -113,6 +114,7 @@ void set_status(string print_path, int no_of_items){
       }else{
          write(STDOUT_FILENO, "Command Mode::", 14);
          write(STDOUT_FILENO, print_path.c_str(), x);
+         write(STDOUT_FILENO, "\n", 1);
       }
     }
   }
@@ -336,15 +338,94 @@ string get_absolute_path(string rel_path){
         ret=get_home();
         rel_path=rel_path.substr(1);
         ret+=rel_path;
+    }else if(rel_path[0]=='/'){
+        ret=rel_path;
     }else if(rel_path[0]=='.'){
         ret=pwds;
         rel_path=rel_path.substr(1);
         ret+=rel_path;
-    }else if(rel_path[0]=='/'){
-        ret=rel_path;
-    }
+    }else{
+        ret=pwds;
+        ret=ret+"/"+rel_path;
+    }  
 
     return ret;
+}
+
+__mode_t get_permissions(string path){
+    struct stat st;
+    stat(path.c_str(), &st);
+
+    __mode_t perms=st.st_mode;
+    return perms;
+}
+
+void create_dir(string dir_name, string destination_path){
+    string d=get_absolute_path(destination_path);
+    int res;
+
+    d=d+"/"+dir_name;
+    cout<<"value of d "<<d<<endl;
+
+    res=mkdir(d.c_str(), 0777);
+    if(res!=0)
+        cout<<"Error";
+    
+}
+
+void create_file(string file_name, string destination_path){
+    int fp;
+    cout<<"destination path in create file func: "<<destination_path<<endl;
+    cout<<"file_name in create file func: "<<file_name<<endl;
+    string file_path=get_absolute_path(destination_path)+"/"+file_name;
+    cout<<"file_name: "<<file_path<<endl;
+    fp=open(file_path.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
+    close(fp);
+}
+
+void copy_dir(string source_file, string destination_directory){
+    string f, s;
+
+    f=get_absolute_path(source_file);
+    s=get_absolute_path(destination_directory);
+
+    //create a directory at the destination-new_dir
+    //list all the files in the source directory in a vector
+    //sort all files in the vector
+
+    //iterate through the vector
+        //if i is a file then copy the file from source dir to new_dir
+        //else check if i is a directory
+            //if yes then recursively call copy_dir(new_source_file, new_destination_file)
+    vector<string> vec;
+    int pos = f.find_last_of("/");
+    string dir_name=f.substr(pos+1);
+    cout<<"dir_name in copy func :"<<dir_name<<endl;
+    create_dir(dir_name/*dir_name*/, destination_directory/*destination path*/);
+    struct dirent *entry;
+    DIR *dir = opendir(f.c_str());
+    if (dir == NULL) {
+        return ;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        vec.push_back(entry->d_name);
+    }
+    closedir(dir);
+    sort(vec.begin(), vec.end());
+
+    for(auto i=vec.begin()+2; i!=vec.end(); ++i){
+        struct stat st;
+        string new_path=f+"/"+(*i);
+        stat(new_path.c_str(), &st);
+        if(S_ISDIR(st.st_mode)!=0){
+            cout<<"new_path: "<<new_path<<endl;
+            string x= s+"/"+dir_name;
+            cout<<"x: "<<x<<endl;
+            copy_dir(new_path, x);
+        }else{
+            create_file((*i),(s+"/"+dir_name));
+        }
+    }
 }
 
 void copy(string source_file, string destination_directory){
@@ -355,25 +436,32 @@ void copy(string source_file, string destination_directory){
     
     f=get_absolute_path(source_file);
     s=get_absolute_path(destination_directory);
-    
-    pos = f.find_last_of("/");
-    s=s+f.substr(pos);
 
-    fd_one = open(f.c_str(), O_RDONLY);
-    if (fd_one == -1)
-    {
-        cout<<"Error opening first_file\n";
+    /*check if file is a directory*/
+    struct stat st;
+    stat(f.c_str(), &st);
+    if(S_ISDIR(st.st_mode)!=0){
+        cout<<"is a directory: \n";
+        copy_dir(source_file, destination_directory);
+    /*check ends*/
+    }else{
+        pos = f.find_last_of("/");
+        s=s+f.substr(pos);
+        __mode_t perms = get_permissions(f.c_str());
+        fd_one = open(f.c_str(), O_RDONLY);
+        if (fd_one == -1)
+        {
+            cout<<"Error opening first_file\n";
+            close(fd_one);
+        }
+        fd_two = open(s.c_str(), O_WRONLY | O_CREAT, perms);
+        while(read(fd_one, &buf, 1))
+        {
+            write(fd_two, &buf, 1);
+        }
         close(fd_one);
+        close(fd_two);
     }
-    fd_two = open(s.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-    while(read(fd_one, &buf, 1))
-    {
-        write(fd_two, &buf, 1);
-    }
-
-
-    close(fd_one);
-    close(fd_two);
 }
 
 void delete_file(string d_file){
@@ -418,12 +506,46 @@ void rename(string old_name, string new_name){
     delete_file(old_name);
 }
 
-void create_file(string file_name, string destination_path){
-    int fp;
-    string file_path=get_absolute_path(destination_path)+file_name;
-    cout<<"file_name: "<<file_path<<endl;
-    fp=open(file_path.c_str(), O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-    close(fp);
+void goto_location(string destination_path){
+    string d_path=get_absolute_path(destination_path);
+    pwds=d_path;
+}
+
+bool search(string psd, string search_for){
+    //get all the files in the pwd in vec
+    //sort the vector
+    //iterate through vec from 0 to n (skipping . and ..)
+        //check if i matches with name, if yes return true
+        //else check if i is a directory 
+            //if yes then update pwd with psd+/+i.name and recursively call search(new_psd, search_for)
+    
+    //return false;
+    vector<string> vec;
+    struct dirent *entry;
+    DIR *dir = opendir(psd.c_str());
+    if (dir == NULL) {
+        return false;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        vec.push_back(entry->d_name);
+    }
+    closedir(dir);
+
+    sort(vec.begin(), vec.end());
+
+    for(auto i=vec.begin()+2; i!=vec.end(); ++i){
+        struct stat st;
+        string new_psd=psd+"/"+(*i);
+        stat(new_psd.c_str(), &st);
+        if(*i == search_for){
+            return true;
+        }else if(S_ISDIR(st.st_mode)!=0){
+            return search(new_psd, search_for);
+        }
+    }
+
+    return false;
+
 }
 
 string refresh_dir_command(){
@@ -447,7 +569,7 @@ string refresh_dir_command(){
     if(command[0]=="copy"){
         int n=command.size();
         for(int i=1; i<n-1; ++i){
-            cout<<"command[i]: "<<command[i]<<" command[n-1] "<<command[n-1]<<endl;
+            //cout<<"command[i]: "<<command[i]<<" command[n-1] "<<command[n-1]<<endl;
             copy(command[i], command[n-1]);
         }
     }else if(command[0]=="delete_file"){
@@ -455,7 +577,7 @@ string refresh_dir_command(){
     }else if(command[0]=="move"){
         int n=command.size();
         for(int i=1; i<n-1; ++i){
-            cout<<"command[i]: "<<command[i]<<" command[n-1] "<<command[n-1]<<endl;
+            //cout<<"command[i]: "<<command[i]<<" command[n-1] "<<command[n-1]<<endl;
             copy(command[i], command[n-1]);
             delete_file(command[i]);
         }
@@ -465,6 +587,23 @@ string refresh_dir_command(){
     }else if(command[0]=="create_file"){
         //create_file <file_name> <destination_path>
         create_file(command[1], command[2]);
+    }else if(command[0]=="goto"){
+        //$ goto <location>
+        goto_location(command[1]);
+    }else if(command[0]=="create_dir"){
+        //$ create_dir <dir_name> <destination_path>
+        create_dir(command[1], command[2]);
+    }else if(command[0]=="search"){
+        //$ search <file_name>
+        bool b=search(pwds, command[1]);
+        if(b)
+            cout<<"True (screen refreshes in 3 seconds)";
+        else
+            cout<<"False (screen refreshes in 3 seconds)";
+        
+        fflush(stdout);
+        unsigned int microsecond = 1000000;
+        usleep(3 * microsecond);
     }
 
     enable_non_can_mode();
@@ -483,7 +622,7 @@ int main(){
         if(switch_nc=='n'){
             c=refresh_dir_normal(forward_stack, backward_stack);
         }
-
+      //  clear_terminal();
         if(switch_nc=='c'){
             sc=refresh_dir_command();
         }
@@ -494,7 +633,7 @@ int main(){
         if(c!='q'){
             c='a';
         }
-        //clear_terminal();
+       // clear_terminal();
     }while(c != 'q' && sc != "quit");
  
     return 0;
