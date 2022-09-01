@@ -548,6 +548,53 @@ bool search(string psd, string search_for){
 
 }
 
+void delete_dir(string dir_path){
+    string path=get_absolute_path(dir_path);
+    //list all the files in the directory in a vector
+    //sort the vector
+    //check if vec.size()<=2
+        //if yes then directory is empty, delete it using rmdir()
+        //else iterate through vec
+            //check if i is a file
+                //if yes then deleted using delete_file function
+                //if no the recusively call delete_dir(updated_path)
+    
+    vector<string> vec;
+    struct dirent *entry;
+    DIR *dir = opendir(path.c_str());
+    if (dir == NULL) {
+        return ;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        vec.push_back(entry->d_name);
+    }
+    closedir(dir);
+
+    sort(vec.begin(), vec.end());
+
+    if(vec.size()<=2){
+        cout<<"dir is empty deleting dir.... "<<dir_path<<endl;
+        if(rmdir(path.c_str())!=0)
+            cout<<"error"<<endl;
+        return ;
+    }else{
+        for(auto i=vec.begin()+2; i!=vec.end(); ++i){
+            struct stat st;
+            string new_path=path+"/"+(*i);
+            stat(new_path.c_str(), &st);
+            if(S_ISDIR(st.st_mode)!=0){
+                delete_dir(new_path);
+            }else{
+                cout<<"deleting file... "<<new_path<<endl;
+                delete_file(new_path);
+            }
+        }
+    }
+
+    if(rmdir(path.c_str())!=0)
+        cout<<"error"<<endl;
+}
+
 string refresh_dir_command(){
     cout<<"\n";
     set_status(pwds, 2);
@@ -604,6 +651,8 @@ string refresh_dir_command(){
         fflush(stdout);
         unsigned int microsecond = 1000000;
         usleep(3 * microsecond);
+    }else if(command[0]=="delete_dir"){
+        delete_dir(command[1]);
     }
 
     enable_non_can_mode();
@@ -622,7 +671,7 @@ int main(){
         if(switch_nc=='n'){
             c=refresh_dir_normal(forward_stack, backward_stack);
         }
-      //  clear_terminal();
+        clear_terminal();
         if(switch_nc=='c'){
             sc=refresh_dir_command();
         }
@@ -633,7 +682,7 @@ int main(){
         if(c!='q'){
             c='a';
         }
-       // clear_terminal();
+        clear_terminal();
     }while(c != 'q' && sc != "quit");
  
     return 0;
