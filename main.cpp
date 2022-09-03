@@ -10,6 +10,7 @@
 #include <stack>
 #include <pwd.h>
 #include <grp.h>
+#include <utility>
 #include <time.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -56,7 +57,7 @@ void disable_non_can_mode(){
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
-string FormatBytes(long long bytes)
+string change_to_bytes(long long bytes)
 {
     string arr[5]={"B","KB","MB","GB","TB"};
     string s="";
@@ -79,20 +80,27 @@ void enable_non_can_mode(){
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+void error_handler(string err=""){
+    cout<<"Error "<<err<<" (screen refreshes in 3 seconds)";
+    fflush(stdout);
+    unsigned int microsecond = 1000000;
+    usleep(3 * microsecond);
+}
+
 void open_file(vector<FileDetails> &vec, int &curr){
    FILE *currfile;
    currfile=fopen((vec[curr].f_path).c_str(), "a");
 
    if(currfile!=NULL){
-      pid_t pid=fork();
-      if(pid<0){
-         perror("Fork failed");
-         exit(0);
-      }
-      if(pid==0){
-         char *exec_args[3] = {(char*)("/usr/bin/gedit"), (char*)((vec[curr].f_path).c_str()), NULL};
-         execv(exec_args[0], exec_args);
-      }
+        pid_t pid=fork();
+        if(pid<0){
+            error_handler(":in create fork.");
+            exit(0);
+        }
+        if(pid==0){
+            char *exec_args[3] = {(char*)("/usr/bin/gedit"), (char*)((vec[curr].f_path).c_str()), NULL};
+            execv(exec_args[0], exec_args);
+        }
    }
 
    fclose(currfile);
@@ -124,8 +132,8 @@ string get_home(){
 
 char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<string> &backward_stack){
     int curr=0;
-    int st=0;         //defined for vertical overflow
-    int ed=19;        //defined for vertical overflow
+    int st=0;         
+    int ed=19;        
     char k, e, y;
 
     if(vec.size()<=20){
@@ -143,22 +151,17 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
                 set_status(backward_stack.top(), vec.size());
             }
             k=cin.get();
-            cout<<"val of k: "<<int(k);
             if(k==27){
                 cin>>e>>y;
                 if(y==65){
-                    //cout<<"up arrow\n";
                     if(curr>0)
                         curr--;
                 }else if(y==66){
-                    //cout<<"down arrow\n";
                     if(curr<vec.size()-1)
                         curr++;
                 }else if(y==67){
-                    //cout<<"right key\n";
                     break;
                 }else if(y==68){
-                    // cout<<"left key\n";
                     break;
                 }
             }else if(k==10 && vec[curr].f_type!="d"){
@@ -217,26 +220,26 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
         }
     }
 
-    if(k==10 && vec[curr].f_type=="d"){         //enter into a directory
+    if(k==10 && vec[curr].f_type=="d"){         
         if(!backward_stack.empty() && vec[curr].f_path != backward_stack.top())
             backward_stack.push(vec[curr].f_path);
         
         pwds=backward_stack.top();
     }
 
-    if(k==27 && y==67){     //right key
+    if(k==27 && y==67){    
         if(!forward_stack.empty()){
-            backward_stack.push(forward_stack.top()); //extract top from forward stack and push to backward stack
-            forward_stack.pop();   //pop form forward stack
+            backward_stack.push(forward_stack.top());
+            forward_stack.pop();
         }
 
         pwds=backward_stack.top();
     }
 
-    if(k==27 && y==68){     //left key
+    if(k==27 && y==68){
         if(!backward_stack.empty()){
-            forward_stack.push(backward_stack.top()); //extract top from backward stack and push to forward stack
-            backward_stack.pop();   //pop form backward stack
+            forward_stack.push(backward_stack.top());
+            backward_stack.pop();
         } 
 
         pwds=backward_stack.top(); 
@@ -260,8 +263,6 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
     }
 
     if(k=='h'){
-        //pop value of back_stack and push to forw_stack 
-        //get home and push it to backward_stack 
         if(!backward_stack.empty()){
             forward_stack.push(backward_stack.top());
             backward_stack.push(get_home());
@@ -299,7 +300,7 @@ char refresh_dir_normal(stack<string> &forward_stack, stack<string> &backward_st
         }
         stat(temp.c_str(), &st);
         off_t size=st.st_size;
-        string fsize = FormatBytes(size);
+        string fsize = change_to_bytes(size);
         string file_type;
         if(S_ISDIR(st.st_mode)==0)
             file_type="-";
@@ -309,9 +310,9 @@ char refresh_dir_normal(stack<string> &forward_stack, stack<string> &backward_st
         struct group  *gr = getgrgid(st.st_gid);  
 
         struct tm lt;
-        time_t t = st.st_mtime; /*st_mtime is type time_t */
+        time_t t = st.st_mtime;
         char mtime[80];
-        localtime_r(&t, &lt); /* convert to struct tm */
+        localtime_r(&t, &lt);
         strftime(mtime, sizeof mtime, "%d %b %Y %T", &lt);
 
         mode_t perm=st.st_mode;
@@ -382,15 +383,31 @@ __mode_t get_permissions(string path){
     return perms;
 }
 
-void create_dir(string dir_name, string destination_path){
+pair<uid_t, gid_t> get_owner_group(string path){
+    struct stat st;
+
+    stat(path.c_str(), &st);
+    struct passwd *pw = getpwuid(st.st_uid);
+    struct group  *gr = getgrgid(st.st_gid);  
+
+    uid_t uid = pw->pw_uid;
+    gid_t gid = gr->gr_gid;
+
+    return {uid, gid};
+}
+
+string create_dir(string dir_name, string destination_path, mode_t mode){
     string d=get_absolute_path(destination_path);
     int res;
 
     d=d+"/"+dir_name;
-    res=mkdir(d.c_str(), 0777);
-    if(res!=0)
-        cout<<"Error";
-    
+    res=mkdir(d.c_str(), mode);
+    if(res!=0){
+        error_handler(":in creating directory.");
+        return "";
+    }    
+
+    return d;
 }
 
 void create_file(string file_name, string destination_path){
@@ -401,24 +418,23 @@ void create_file(string file_name, string destination_path){
     close(fp);
 }
 
+void copy(string source_file, string destination_directory);
 void copy_dir(string source_file, string destination_directory){
     string f, s;
 
     f=get_absolute_path(source_file);
     s=get_absolute_path(destination_directory);
 
-    //create a directory at the destination-new_dir
-    //list all the files in the source directory in a vector
-    //sort all files in the vector
-
-    //iterate through the vector
-        //if i is a file then copy the file from source dir to new_dir
-        //else check if i is a directory
-            //if yes then recursively call copy_dir(new_source_file, new_destination_file)
     vector<string> vec;
     int pos = f.find_last_of("/");
     string dir_name=f.substr(pos+1);
-    create_dir(dir_name, destination_directory);
+    __mode_t perms = get_permissions(f.c_str());
+    string d_path=create_dir(dir_name, destination_directory, perms);
+    pair<uid_t, gid_t> p=get_owner_group(f);
+    if(chown(d_path.c_str(), p.first, p.second)==-1){
+        error_handler(":in changing owner/group of copied dir.");
+        return ;
+    }
     struct dirent *entry;
     DIR *dir = opendir(f.c_str());
     if (dir == NULL) {
@@ -438,7 +454,8 @@ void copy_dir(string source_file, string destination_directory){
             string x= s+"/"+dir_name;
             copy_dir(new_path, x);
         }else{
-            create_file((*i),(s+"/"+dir_name));
+            string temp=s+"/"+dir_name;
+            copy(new_path, temp);
         }
     }
 }
@@ -452,13 +469,10 @@ void copy(string source_file, string destination_directory){
     f=get_absolute_path(source_file);
     s=get_absolute_path(destination_directory);
 
-    /*check if file is a directory*/
     struct stat st;
     stat(f.c_str(), &st);
     if(S_ISDIR(st.st_mode)!=0){
-        cout<<"is a directory: \n";
         copy_dir(source_file, destination_directory);
-    /*check ends*/
     }else{
         pos = f.find_last_of("/");
         s=s+f.substr(pos);
@@ -466,8 +480,9 @@ void copy(string source_file, string destination_directory){
         fd_one = open(f.c_str(), O_RDONLY);
         if (fd_one == -1)
         {
-            cout<<"Error opening first_file\n";
             close(fd_one);
+            error_handler(":in opening source file.");
+            return ;
         }
         fd_two = open(s.c_str(), O_WRONLY | O_CREAT, perms);
         while(read(fd_one, &buf, 1))
@@ -476,6 +491,11 @@ void copy(string source_file, string destination_directory){
         }
         close(fd_one);
         close(fd_two);
+        pair<uid_t, gid_t> p=get_owner_group(s);
+        if(chown(s.c_str(), p.first, p.second)==-1){
+            error_handler(":in changing owner/group of copied file.");
+            return ;
+        }
     }
 }
 
@@ -483,8 +503,10 @@ void delete_file(string d_file){
     string f;
 
     f=get_absolute_path(d_file);
-    if( remove(f.c_str()) != 0 )
-        perror( "Error" );
+    if( unlink(f.c_str()) != 0 ){
+        error_handler(":in deleting file.");
+        return ;
+    }
 }
 
 void goto_location(string destination_path){
@@ -494,14 +516,6 @@ void goto_location(string destination_path){
 }
 
 bool search(string psd, string search_for){
-    //get all the files in the pwd in vec
-    //sort the vector
-    //iterate through vec from 0 to n (skipping . and ..)
-        //check if i matches with name, if yes return true
-        //else check if i is a directory 
-            //if yes then update pwd with psd+/+i.name and recursively call search(new_psd, search_for)
-    
-    //return false;
     vector<string> vec;
     struct dirent *entry;
     DIR *dir = opendir(psd.c_str());
@@ -532,15 +546,6 @@ bool search(string psd, string search_for){
 
 void delete_dir(string dir_path){
     string path=get_absolute_path(dir_path);
-    //list all the files in the directory in a vector
-    //sort the vector
-    //check if vec.size()<=2
-        //if yes then directory is empty, delete it using rmdir()
-        //else iterate through vec
-            //check if i is a file
-                //if yes then deleted using delete_file function
-                //if no the recusively call delete_dir(updated_path)
-    
     vector<string> vec;
     struct dirent *entry;
     DIR *dir = opendir(path.c_str());
@@ -556,8 +561,10 @@ void delete_dir(string dir_path){
     sort(vec.begin(), vec.end());
 
     if(vec.size()<=2){
-        if(rmdir(path.c_str())!=0)
-            cout<<"Error"<<endl;
+        if(rmdir(path.c_str())!=0){
+            error_handler(":in deleting directory.");
+            return ;
+        }
         return ;
     }else{
         for(auto i=vec.begin()+2; i!=vec.end(); ++i){
@@ -572,8 +579,10 @@ void delete_dir(string dir_path){
         }
     }
 
-    if(rmdir(path.c_str())!=0)
-        cout<<"Error"<<endl;
+    if(rmdir(path.c_str())!=0){
+        error_handler(":in deleting directory.");
+        return ;
+    }
 }
 
 void move_file_dir(string source_file, string destination_directory){
@@ -585,7 +594,8 @@ void move_file_dir(string source_file, string destination_directory){
     d= d + s.substr(pos);
 
     if(rename(s.c_str(), d.c_str())==-1){
-        cout<<"Error"<<endl;
+        error_handler(":in moving directory/file.");
+        return ;
     }
 }
 
@@ -595,7 +605,8 @@ void rename_file_dir(string source_file, string destination_directory){
     int pos;
 
     if(rename(s.c_str(), d.c_str())==-1){
-        cout<<"Error"<<endl;
+        error_handler(":in renaming file/directory.");
+        return ;
     }
 }
 
@@ -634,7 +645,7 @@ string refresh_dir_command(){
     }else if(command.size()==2 && command[0]=="goto"){
         goto_location(command[1]);
     }else if(command.size()==3 && command[0]=="create_dir"){
-        create_dir(command[1], command[2]);
+        create_dir(command[1], command[2], 0777);
     }else if(command.size()==2 && command[0]=="search"){
         bool b=search(pwds, command[1]);
         if(b)
@@ -650,7 +661,7 @@ string refresh_dir_command(){
     }else if(s=="quit"){
         //do nothing
     }else{
-        cout<<"Not a valid command (screen refreshed in 3 seconds)";
+        cout<<"Not a valid command (screen refreshes in 3 seconds)";
         fflush(stdout);
         unsigned int microsecond = 1000000;
         usleep(3 * microsecond);
@@ -676,7 +687,6 @@ int main(){
         if(switch_nc=='c'){
             sc=refresh_dir_command();
         }
-        
         if(sc!="quit"){
             sc="sc";
         }
