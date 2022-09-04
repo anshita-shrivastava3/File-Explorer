@@ -1,3 +1,9 @@
+/*==============================================================================
+Advanced Operating System: Assignment 1
+Anshita Shrivastava
+2022202014
+Terminal based File Explorer
+================================================================================*/
 #include <iostream>
 #include <dirent.h>
 #include <sys/types.h>
@@ -25,6 +31,10 @@ struct termios orig_termios;
 char switch_nc='n';
 string pwds;
 
+/*==============================================================================
+Class to store files and info of the directory currently being displayed in Normal 
+mode.
+================================================================================*/
 class FileDetails{
 
    public:
@@ -49,22 +59,31 @@ class FileDetails{
    }
 };
 
+/*==============================================================================
+To clear the terminal.
+================================================================================*/
 void clear_terminal(){
    cout << "\033c";
 }
 
+/*==============================================================================
+Disables non canonical mode to go back to canonical mode.
+================================================================================*/
 void disable_non_can_mode(){
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 
-string change_to_bytes(long long bytes)
+/*==============================================================================
+Helper function to converted file size to bytes.
+================================================================================*/
+string change_to_bytes(long long inp)
 {
     string arr[5]={"B","KB","MB","GB","TB"};
     string s="";
     int i;
-    int res = bytes;
-    for (i = 0; i < 5 && bytes >= 1024; i++, bytes /= 1024){
-        res = bytes / 1024;
+    int res = inp;
+    for (i = 0; i<5 && inp>=1024; i++, inp/=1024){
+        res = inp / 1024;
     }
  
     s=to_string(res);
@@ -72,6 +91,9 @@ string change_to_bytes(long long bytes)
     return (s + " " + arr[i]);
 }
 
+/*==============================================================================
+To enable non canonical mode.
+================================================================================*/
 void enable_non_can_mode(){
    tcgetattr(STDIN_FILENO, &orig_termios);
    atexit(disable_non_can_mode);
@@ -80,6 +102,10 @@ void enable_non_can_mode(){
    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
+/*==============================================================================
+Error handler function being called at multiple places. Parameter 'err' is being
+passed by all calling function giving details of the error. 
+================================================================================*/
 void error_handler(string err=""){
     cout<<"Error "<<err<<" (screen refreshes in 3 seconds)";
     fflush(stdout);
@@ -87,6 +113,9 @@ void error_handler(string err=""){
     usleep(3 * microsecond);
 }
 
+/*==============================================================================
+To open the selected file in gedit.
+================================================================================*/
 void open_file(vector<FileDetails> &vec, int &curr){
    FILE *currfile;
    currfile=fopen((vec[curr].f_path).c_str(), "a");
@@ -106,6 +135,10 @@ void open_file(vector<FileDetails> &vec, int &curr){
    fclose(currfile);
 }
 
+
+/*==============================================================================
+To set the status at the bottomof the terminal in both Normal and Command mode
+================================================================================*/
 void set_status(string print_path, int no_of_items){
     char to_set [PATH_MAX+1];
     realpath(print_path.c_str(), to_set);
@@ -128,10 +161,19 @@ void set_status(string print_path, int no_of_items){
     }
 }
 
+
+/*==============================================================================
+To get the home directory of the user.
+================================================================================*/
 string get_home(){
     return getpwuid(getuid())->pw_dir;
 }
 
+
+/*==============================================================================
+To display files and directory of the pwd. Also handles arrow movements, h to 
+go to home of the user and backspace to go one level up the pwd. 
+================================================================================*/
 char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<string> &backward_stack){
     int curr=0;
     int st=0;         
@@ -235,7 +277,9 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
 
     if(k==27 && y==67){     //right
         if(!forward_stack.empty()){
-            backward_stack.push(forward_stack.top());
+            if(backward_stack.empty() || backward_stack.top()!=forward_stack.top())
+                backward_stack.push(forward_stack.top());
+
             forward_stack.pop();
         }
 
@@ -244,23 +288,31 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
 
     if(k==27 && y==68){     //left
         if(!backward_stack.empty()){
-            forward_stack.push(backward_stack.top());
+            if(forward_stack.empty() || forward_stack.top()!=backward_stack.top())
+                forward_stack.push(backward_stack.top());
+
             backward_stack.pop();
         } 
 
         pwds=backward_stack.top(); 
     }
 
-    if(k==127){
+    if(k==127){   
         if(!backward_stack.empty()){
             string temp=backward_stack.top();
             int pos = temp.find_last_of("/");
             string b_path=temp.substr(0, pos);
             if(b_path=="")
                 b_path="/";
-            forward_stack.push(backward_stack.top());
+
+            if(forward_stack.empty() || forward_stack.top()!=backward_stack.top())
+                forward_stack.push(backward_stack.top());
+
             backward_stack.pop();
-            backward_stack.push(b_path);
+
+            if(backward_stack.empty() || backward_stack.top()!=b_path)
+                backward_stack.push(b_path);
+            
         }  
     }
 
@@ -270,8 +322,11 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
 
     if(k=='h'){
         if(!backward_stack.empty()){
-            forward_stack.push(backward_stack.top());
-            backward_stack.push(get_home());
+            if(forward_stack.empty() || forward_stack.top()!=backward_stack.top())
+                forward_stack.push(backward_stack.top());
+
+            if(backward_stack.empty() || backward_stack.top()!=get_home())
+                backward_stack.push(get_home());
         }
 
         while(!forward_stack.empty()){
@@ -282,6 +337,11 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
     return k;
 }
 
+
+/*==============================================================================
+To get the details of all the files in the pwd along with their meta data like
+permission, owner/group, lastmodified date/time, size and name.
+================================================================================*/
 char refresh_dir_normal(stack<string> &forward_stack, stack<string> &backward_stack){
     struct dirent **file_list;
     vector<FileDetails> vec;
@@ -347,6 +407,11 @@ char refresh_dir_normal(stack<string> &forward_stack, stack<string> &backward_st
     return ret_ch;
 }
 
+
+/*==============================================================================
+To to break the space setaparated command into individual words for further 
+processing.
+================================================================================*/
 vector<string> get_command(string s){
     stringstream temp(s);
     vector<string> command;
@@ -358,6 +423,11 @@ vector<string> get_command(string s){
     return command;
 }
 
+
+/*==============================================================================
+To get the absolute path from relative path of the file using stack. Handles ~(home), .(current
+directory) , ..(previous directory).
+================================================================================*/
 string get_absolute_path(string rel_path){
     string ret;
     string temp;
@@ -418,6 +488,10 @@ string get_absolute_path(string rel_path){
     return ret;
 }
 
+
+/*==============================================================================
+To get permissions of a file or directory. Being used in copying functions.
+================================================================================*/
 __mode_t get_permissions(string path){
     struct stat st;
 
@@ -426,6 +500,10 @@ __mode_t get_permissions(string path){
     return perms;
 }
 
+
+/*==============================================================================
+To get the owner and group of a file or directory. Being used in copying functions.
+================================================================================*/
 pair<uid_t, gid_t> get_owner_group(string path){
     struct stat st;
 
@@ -439,6 +517,9 @@ pair<uid_t, gid_t> get_owner_group(string path){
     return {uid, gid};
 }
 
+/*==============================================================================
+Being called to handle create_dir command in Command mode.
+================================================================================*/
 string create_dir(string dir_name, string destination_path, mode_t mode){
     string d=get_absolute_path(destination_path);
     int res;
@@ -453,6 +534,10 @@ string create_dir(string dir_name, string destination_path, mode_t mode){
     return d;
 }
 
+
+/*==============================================================================
+Being called to handle create_file command in Command mode.
+================================================================================*/
 void create_file(string file_name, string destination_path){
     int fp;
 
@@ -462,6 +547,9 @@ void create_file(string file_name, string destination_path){
 }
 
 void copy(string source_file, string destination_directory);
+/*==============================================================================
+Being called to handle copy of a directory command in Command mode.
+================================================================================*/
 void copy_dir(string source_file, string destination_directory){
     string f, s;
 
@@ -503,6 +591,9 @@ void copy_dir(string source_file, string destination_directory){
     }
 }
 
+/*==============================================================================
+Being called to handle copying a file or a directory command in Command mode.
+================================================================================*/
 void copy(string source_file, string destination_directory){
     char buf;
     int fd_one, fd_two;
@@ -542,6 +633,9 @@ void copy(string source_file, string destination_directory){
     }
 }
 
+/*==============================================================================
+Being called to handle delete_file command in Command mode.
+================================================================================*/
 void delete_file(string d_file){
     string f;
 
@@ -552,6 +646,10 @@ void delete_file(string d_file){
     }
 }
 
+/*==============================================================================
+Helper function to check if a path is valid or not. Being used in goto_location()
+function.
+================================================================================*/
 bool check_valid_path(string v_path){
     bool flag=false;
 
@@ -583,6 +681,9 @@ bool check_valid_path(string v_path){
     return flag;
 }
 
+/*==============================================================================
+Being called to handle goto command in Command mode.
+================================================================================*/
 void goto_location(string destination_path){
     string d_path=get_absolute_path(destination_path);
 
@@ -592,6 +693,9 @@ void goto_location(string destination_path){
         error_handler(":not a valid path");
 }
 
+/*==============================================================================
+Being called to handle search command in Command mode.
+================================================================================*/
 bool search(string psd, string search_for){
     vector<string> vec;
     struct dirent *entry;
@@ -611,7 +715,6 @@ bool search(string psd, string search_for){
         struct stat st;
         string new_psd=psd+"/"+(*i);
         stat(new_psd.c_str(), &st);
-        cout<<"searchfor "<<search_for<<endl;
         if(*i == search_for){
             return true;
         }else if(S_ISDIR(st.st_mode)!=0){
@@ -623,6 +726,9 @@ bool search(string psd, string search_for){
     return false;
 }
 
+/*==============================================================================
+Being called to handle delete_dir command in Command mode.
+================================================================================*/
 void delete_dir(string dir_path){
     string path=get_absolute_path(dir_path);
     vector<string> vec;
@@ -664,6 +770,9 @@ void delete_dir(string dir_path){
     }
 }
 
+/*==============================================================================
+Being called to handle move command in Command mode.
+================================================================================*/
 void move_file_dir(string source_file, string destination_directory){
     string s=get_absolute_path(source_file);
     string d=get_absolute_path(destination_directory);
@@ -678,6 +787,9 @@ void move_file_dir(string source_file, string destination_directory){
     }
 }
 
+/*==============================================================================
+Being called to handle rename command in Command mode.
+================================================================================*/
 void rename_file_dir(string source_file, string destination_directory){
     string s=get_absolute_path(source_file);
     string d=get_absolute_path(destination_directory);
@@ -689,6 +801,10 @@ void rename_file_dir(string source_file, string destination_directory){
     }
 }
 
+/*==============================================================================
+To handle command mode. Responible for taking the input and breaking the commands
+for further processing.
+================================================================================*/
 string refresh_dir_command(){
     cout<<"\n";
     set_status(pwds, 2);
@@ -750,6 +866,9 @@ string refresh_dir_command(){
     return s;
 }
 
+/*==============================================================================
+Main function
+================================================================================*/
 int main(){
     enable_non_can_mode();
     stack<string> forward_stack;
