@@ -467,8 +467,8 @@ string get_absolute_path(string rel_path){
             while (!st1.empty()) {
                 string temp = st1.top();
                 
-                if (st1.size() != 1)
-                    ret.append(temp + "/");
+                if (st1.size()!=1)
+                    ret.append(temp+"/");
                 else
                     ret.append(temp);
         
