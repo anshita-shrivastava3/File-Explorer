@@ -191,9 +191,8 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
                 cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
                 }
             }
-            if(!backward_stack.empty()){
-                set_status(backward_stack.top(), vec.size());
-            }
+            set_status(pwds, vec.size());
+            
             k=cin.get();
             if(k==27){
                 cin>>e>>y;
@@ -227,9 +226,8 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
                 cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
                 }
             }
-            if(!backward_stack.empty()){
-                set_status(backward_stack.top(), 20);
-            }
+            set_status(pwds, 20);
+            
             k=cin.get();
             if(k==27){
                 cin>>e>>y;
@@ -265,55 +263,52 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
     }
 
     if(k==10 && vec[curr].f_type=="d"){         
-        if(!backward_stack.empty() && vec[curr].f_path != backward_stack.top())
-            backward_stack.push(vec[curr].f_path);
-        
-        pwds=backward_stack.top();
 
-        while(!forward_stack.empty()){
-            forward_stack.pop();
+        if(pwds!=vec[curr].f_path){
+            backward_stack.push(pwds);
+            pwds=vec[curr].f_path;
+
+            while(!forward_stack.empty()){
+                forward_stack.pop();
+            }
         }
+        
     }
 
     if(k==27 && y==67){     //right
-        if(!forward_stack.empty()){
-            if(backward_stack.empty() || backward_stack.top()!=forward_stack.top())
-                backward_stack.push(forward_stack.top());
 
+        if(!forward_stack.empty()){
+            if(backward_stack.empty() || backward_stack.top()!=pwds)
+                backward_stack.push(pwds);
+
+            pwds=forward_stack.top();
             forward_stack.pop();
         }
 
-        pwds=backward_stack.top();
+
     }
 
     if(k==27 && y==68){     //left
+
         if(!backward_stack.empty()){
-            if(forward_stack.empty() || forward_stack.top()!=backward_stack.top())
-                forward_stack.push(backward_stack.top());
+            if(forward_stack.empty() || forward_stack.top()!=pwds)
+                forward_stack.push(pwds);
 
+            pwds=backward_stack.top();
             backward_stack.pop();
-        } 
-
-        pwds=backward_stack.top(); 
+        }
     }
 
     if(k==127){   
-        if(!backward_stack.empty()){
-            string temp=backward_stack.top();
-            int pos = temp.find_last_of("/");
-            string b_path=temp.substr(0, pos);
-            if(b_path=="")
-                b_path="/";
+        string temp=pwds;
+        int pos = temp.find_last_of("/");
+        string b_path=temp.substr(0, pos);
+        if(b_path=="")
+            b_path="/";
 
-            if(forward_stack.empty() || forward_stack.top()!=backward_stack.top())
-                forward_stack.push(backward_stack.top());
-
-            backward_stack.pop();
-
-            if(backward_stack.empty() || backward_stack.top()!=b_path)
-                backward_stack.push(b_path);
-            
-        }  
+        if(backward_stack.empty() || backward_stack.top()!=pwds)
+            backward_stack.push(pwds);
+        pwds=b_path;        
     }
 
     if(k==58){
@@ -321,13 +316,11 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
     }
 
     if(k=='h'){
-        if(!backward_stack.empty()){
-            if(forward_stack.empty() || forward_stack.top()!=backward_stack.top())
-                forward_stack.push(backward_stack.top());
 
-            if(backward_stack.empty() || backward_stack.top()!=get_home())
-                backward_stack.push(get_home());
-        }
+        if(backward_stack.empty() || backward_stack.top()!=pwds)
+            backward_stack.push(pwds);
+
+        pwds=get_home();
 
         while(!forward_stack.empty()){
             forward_stack.pop();
@@ -348,17 +341,16 @@ char refresh_dir_normal(stack<string> &forward_stack, stack<string> &backward_st
     char ret_ch;
     int n;
 
-    if(!backward_stack.empty()){
-        n=scandir(backward_stack.top().c_str(), &file_list, 0, alphasort);
-    }
+    n=scandir(pwds.c_str(), &file_list, 0, alphasort);
+    
     for(int i=0; i<n; ++i){
         struct stat st;
         
-        string temp=backward_stack.top()+"/";
+        string temp=pwds+"/";
         if(strcmp(file_list[i]->d_name, ".")==0){
-            temp=backward_stack.top();
+            temp=pwds;
         }else if(strcmp(file_list[i]->d_name, "..")==0){
-            temp=backward_stack.top();
+            temp=pwds;
             int pos = temp.find_last_of("/");
             string b_path=temp.substr(0, pos);
             if(b_path=="")
@@ -547,6 +539,7 @@ void create_file(string file_name, string destination_path){
 }
 
 void copy(string source_file, string destination_directory);
+
 /*==============================================================================
 Being called to handle copy of a directory command in Command mode.
 ================================================================================*/
@@ -874,7 +867,6 @@ int main(){
     stack<string> forward_stack;
     stack<string> backward_stack;
     pwds=get_home();
-    backward_stack.push(pwds);
     char c='a';
     string sc="sc";
     do{  
