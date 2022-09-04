@@ -114,7 +114,7 @@ void error_handler(string err=""){
 }
 
 /*==============================================================================
-To open the selected file in gedit.
+To open the selected file in xdg.
 ================================================================================*/
 void open_file(vector<FileDetails> &vec, int &curr){
    FILE *currfile;
@@ -127,7 +127,7 @@ void open_file(vector<FileDetails> &vec, int &curr){
             exit(0);
         }
         if(pid==0){
-            char *exec_args[3] = {(char*)("/usr/bin/gedit"), (char*)((vec[curr].f_path).c_str()), NULL};
+            char *exec_args[3] = {(char*)("/usr/bin/xdg-open"), (char*)((vec[curr].f_path).c_str()), NULL};
             execv(exec_args[0], exec_args);
         }
    }
