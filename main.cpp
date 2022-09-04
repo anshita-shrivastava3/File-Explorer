@@ -107,23 +107,25 @@ void open_file(vector<FileDetails> &vec, int &curr){
 }
 
 void set_status(string print_path, int no_of_items){
-   struct winsize ws;
-   int x=print_path.size();
-   ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
-   int n=(ws.ws_row-no_of_items-1);
-   for (int y = 0; y < n; y++) {
-    write(STDOUT_FILENO, "\n", 1);
-    if (y == n-1) {
-      if(switch_nc=='n'){
-         write(STDOUT_FILENO, "Normal Mode::", 14);
-         write(STDOUT_FILENO, print_path.c_str(), x);
-      }else{
-         write(STDOUT_FILENO, "Command Mode::", 14);
-         write(STDOUT_FILENO, print_path.c_str(), x);
-         write(STDOUT_FILENO, "\n", 1);
-      }
+    char to_set [PATH_MAX+1];
+    realpath(print_path.c_str(), to_set);
+    struct winsize ws;
+    int x=print_path.size();
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
+    int n=(ws.ws_row-no_of_items-1);
+    for (int y = 0; y < n; y++) {
+        write(STDOUT_FILENO, "\n", 1);
+        if (y == n-1) {
+        if(switch_nc=='n'){
+            write(STDOUT_FILENO, "Normal Mode::", 14);
+            write(STDOUT_FILENO, to_set, x);
+        }else{
+            write(STDOUT_FILENO, "Command Mode::", 14);
+            write(STDOUT_FILENO, to_set, x);
+            write(STDOUT_FILENO, "\n", 1);
+        }
+        }
     }
-  }
 }
 
 string get_home(){
@@ -142,9 +144,9 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
             for(int i=0; i<vec.size(); ++i){
                 if(curr==i){
                 cout<<"->";
-                cout<<setw(18)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(20)<<vec[i].f_name<<"\n";
+                cout<<setw(18)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
                 }else{
-                cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(20)<<vec[i].f_name<<"\n";
+                cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
                 }
             }
             if(!backward_stack.empty()){
@@ -178,9 +180,9 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
             for(int i=st; i<=ed; ++i){
                 if(curr==i){
                 cout<<"->";
-                cout<<setw(18)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(30)<<vec[i].f_name<<"\n";
+                cout<<setw(18)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
                 }else{
-                cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(30)<<vec[i].f_name<<"\n";
+                cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
                 }
             }
             if(!backward_stack.empty()){
@@ -197,7 +199,7 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
                     }else{
                         curr--;
                     }
-                }else if(y==66 && ed!=vec.size()-1){
+                }else if(y==66 && curr!=vec.size()-1){
                     if(curr==ed){
                         st++;
                         ed++;
@@ -225,9 +227,13 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
             backward_stack.push(vec[curr].f_path);
         
         pwds=backward_stack.top();
+
+        while(!forward_stack.empty()){
+            forward_stack.pop();
+        }
     }
 
-    if(k==27 && y==67){    
+    if(k==27 && y==67){     //right
         if(!forward_stack.empty()){
             backward_stack.push(forward_stack.top());
             forward_stack.pop();
@@ -236,7 +242,7 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
         pwds=backward_stack.top();
     }
 
-    if(k==27 && y==68){
+    if(k==27 && y==68){     //left
         if(!backward_stack.empty()){
             forward_stack.push(backward_stack.top());
             backward_stack.pop();
@@ -266,6 +272,10 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
         if(!backward_stack.empty()){
             forward_stack.push(backward_stack.top());
             backward_stack.push(get_home());
+        }
+
+        while(!forward_stack.empty()){
+            forward_stack.pop();
         }
     }
 
@@ -350,27 +360,60 @@ vector<string> get_command(string s){
 
 string get_absolute_path(string rel_path){
     string ret;
+    string temp;
+    stack<string> p_st;
 
     if(rel_path.size()>0){
         if(rel_path=="~" || rel_path=="~/"){
             ret=get_home();
-        }else if(rel_path=="."){
-            ret=pwds;
-        }else if(rel_path[0]=='~'){
-            ret=get_home();
-            rel_path=rel_path.substr(1);
-            ret+=rel_path;
-        }else if(rel_path[0]=='/'){
-            ret=rel_path;
-        }else if(rel_path[0]=='.'){
-            ret=pwds;
-            rel_path=rel_path.substr(1);
-            ret+=rel_path;
         }else{
-            ret=pwds;
-            ret=ret+"/"+rel_path;
+            ret.append("/");
+            if(rel_path[0]=='~'){
+                rel_path=rel_path.substr(1);
+                rel_path=get_home()+"/"+rel_path;
+            }else{
+                rel_path=pwds+"/"+rel_path;
+            }
+            int n = rel_path.length();
+            for (int i=0; i< n; ++i) {
+                temp.clear();
+        
+                while (rel_path[i] == '/')
+                    i++;
+
+                while (i<n && rel_path[i] != '/') {
+                    temp.push_back(rel_path[i]);
+                    i++;
+                }
+
+                if (temp.compare("..") == 0) {
+                    if (!p_st.empty())
+                        p_st.pop();           
+                }else if(temp.compare(".") == 0){
+                    continue;
+                }else if(temp.length() != 0){
+                    p_st.push(temp);
+                }
+            }
+
+            stack<string> st1;
+            while (!p_st.empty()) {
+                st1.push(p_st.top());
+                p_st.pop();
+            }
+
+            while (!st1.empty()) {
+                string temp = st1.top();
+                
+                if (st1.size() != 1)
+                    ret.append(temp + "/");
+                else
+                    ret.append(temp);
+        
+                st1.pop();
+            }
         }
-    }  
+    }
 
     return ret;
 }
@@ -509,10 +552,44 @@ void delete_file(string d_file){
     }
 }
 
+bool check_valid_path(string v_path){
+    bool flag=false;
+
+    int pos = v_path.find_last_of("/");
+    string path=v_path.substr(0, pos);
+    string dir_s=v_path.substr(pos+1);
+    if(path=="")
+        path="/";
+
+    struct dirent *entry;
+    DIR *dir = opendir(path.c_str());
+
+    if (dir == NULL) {
+        return false;
+    }
+    while ((entry = readdir(dir)) != NULL) {
+        if(dir_s==entry->d_name){
+            struct stat st;
+            string goto_path=path+"/"+entry->d_name;
+            stat(goto_path.c_str(), &st);
+            if(S_ISDIR(st.st_mode)!=0){
+                flag=true;
+                break;
+            }
+        }
+    }
+    closedir(dir);
+
+    return flag;
+}
+
 void goto_location(string destination_path){
     string d_path=get_absolute_path(destination_path);
 
-    pwds=d_path;
+    if(check_valid_path(d_path))
+        pwds=d_path;
+    else
+        error_handler(":not a valid path");
 }
 
 bool search(string psd, string search_for){
@@ -529,15 +606,17 @@ bool search(string psd, string search_for){
     closedir(dir);
 
     sort(vec.begin(), vec.end());
-
+    
     for(auto i=vec.begin()+2; i!=vec.end(); ++i){
         struct stat st;
         string new_psd=psd+"/"+(*i);
         stat(new_psd.c_str(), &st);
+        cout<<"searchfor "<<search_for<<endl;
         if(*i == search_for){
             return true;
         }else if(S_ISDIR(st.st_mode)!=0){
-            return search(new_psd, search_for);
+            if(search(new_psd, search_for))
+                return true;
         }
     }
 
