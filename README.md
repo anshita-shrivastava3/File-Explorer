@@ -98,15 +98,4 @@ search foo.txt
 Search for the given filename under the current directory recursively
 
 
-**2.6 Snapshotting the filesystem and dump into a file** 
-```
-snapshot <folder> <dumpfile>​
-```
-
-```
-Eg:
-snapshot ~/foobar/ dumpimg
-```
-Given a base directory this command recursively crawl the directory and store the output in dumpfile.
-
 **2.7 On pressing ‘ESC’ key the application should go to Normal Mode**
