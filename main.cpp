@@ -658,7 +658,6 @@ Helper function to check if a path is valid or not. Being used in goto_location(
 function.
 ================================================================================*/
 bool check_valid_path(string v_path){
-    cout<<"inside check_valid_path: "<<v_path<<endl;
     bool flag=false;
 
     int pos = v_path.find_last_of("/");
@@ -666,7 +665,6 @@ bool check_valid_path(string v_path){
     string dir_s=v_path.substr(pos+1);
     if(path=="")
         path="/";
-    cout<<"check path var: "<<path<<endl;
     struct dirent *entry;
     DIR *dir = opendir(path.c_str());
 
@@ -677,7 +675,6 @@ bool check_valid_path(string v_path){
         if(dir_s==entry->d_name){
             struct stat st;
             string goto_path=path+"/"+entry->d_name;
-            cout<<"check path: "<<goto_path<<endl;
             stat(goto_path.c_str(), &st);
             if(S_ISDIR(st.st_mode)!=0){
                 flag=true;
@@ -695,7 +692,6 @@ Being called to handle goto command in Command mode.
 ================================================================================*/
 void goto_location(string destination_path){
     string d_path=get_absolute_path(destination_path);
-    cout<<"inside goto_loc "<<d_path<<endl;
     if(check_valid_path(d_path))
         pwds=d_path;
     else
