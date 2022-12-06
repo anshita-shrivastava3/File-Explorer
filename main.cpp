@@ -184,11 +184,17 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
         while(k!=58 && k!='q' && k!=127){
             clear_terminal();
             for(int i=0; i<vec.size(); ++i){
-                if(curr==i){
-                cout<<"->";
-                cout<<setw(18)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
+                string name;
+                if(vec[i].f_name.size()<=15){
+                    name = vec[i].f_name;
                 }else{
-                cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
+                    name = vec[i].f_name.substr(0, 12)+"...";
+                }
+                if(curr==i){
+                    cout<<"->";
+                    cout<<setw(18)<<name<<setw(18)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_perm<<"\n";
+                }else{
+                    cout<<setw(20)<<name<<setw(18)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_perm<<"\n";
                 }
             }
             set_status(pwds, vec.size());
@@ -219,11 +225,17 @@ char print_files(vector<FileDetails> &vec, stack<string> &forward_stack, stack<s
         while(k!=58 && k!='q' && k!=127){
             clear_terminal();
             for(int i=st; i<=ed; ++i){
-                if(curr==i){
-                cout<<"->";
-                cout<<setw(18)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
+                string name;
+                if(vec[i].f_name.size()<=15){
+                    name = vec[i].f_name;
                 }else{
-                cout<<setw(20)<<vec[i].f_perm<<setw(20)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_name<<"\n";
+                    name = vec[i].f_name.substr(0, 12)+"...";
+                }
+                if(curr==i){
+                    cout<<"->";
+                    cout<<setw(18)<<name<<setw(18)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_perm<<"\n";
+                }else{
+                    cout<<setw(20)<<name<<setw(18)<<vec[i].f_user<<setw(20)<<vec[i].f_group<<setw(20)<<vec[i].f_size<<setw(30)<<vec[i].f_time<<setw(50)<<vec[i].f_perm<<"\n";
                 }
             }
             set_status(pwds, 20);
@@ -412,7 +424,7 @@ vector<string> get_command(string s){
         command.push_back(t);
     }  
 
-    return command;
+    return command;comma
 }
 
 
@@ -433,6 +445,8 @@ string get_absolute_path(string rel_path){
             if(rel_path[0]=='~'){
                 rel_path=rel_path.substr(1);
                 rel_path=get_home()+"/"+rel_path;
+            }else if(rel_path[0]=='/'){
+                //do nothing since absolute path   
             }else{
                 rel_path=pwds+"/"+rel_path;
             }
@@ -644,6 +658,7 @@ Helper function to check if a path is valid or not. Being used in goto_location(
 function.
 ================================================================================*/
 bool check_valid_path(string v_path){
+    cout<<"inside check_valid_path: "<<v_path<<endl;
     bool flag=false;
 
     int pos = v_path.find_last_of("/");
@@ -651,7 +666,7 @@ bool check_valid_path(string v_path){
     string dir_s=v_path.substr(pos+1);
     if(path=="")
         path="/";
-
+    cout<<"check path var: "<<path<<endl;
     struct dirent *entry;
     DIR *dir = opendir(path.c_str());
 
@@ -662,6 +677,7 @@ bool check_valid_path(string v_path){
         if(dir_s==entry->d_name){
             struct stat st;
             string goto_path=path+"/"+entry->d_name;
+            cout<<"check path: "<<goto_path<<endl;
             stat(goto_path.c_str(), &st);
             if(S_ISDIR(st.st_mode)!=0){
                 flag=true;
@@ -679,7 +695,7 @@ Being called to handle goto command in Command mode.
 ================================================================================*/
 void goto_location(string destination_path){
     string d_path=get_absolute_path(destination_path);
-
+    cout<<"inside goto_loc "<<d_path<<endl;
     if(check_valid_path(d_path))
         pwds=d_path;
     else
