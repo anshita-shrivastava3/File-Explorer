@@ -10,6 +10,7 @@ Normal mode is the default mode of your application. It should have the followin
   a. Every file in the directory should be displayed on a new line with the following
 attributes for each file -
     i. File Name
+    
     ii. File Size
     iii. Ownership (user and group) and Permissions
     iv. Last modified
